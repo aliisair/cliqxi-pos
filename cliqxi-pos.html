@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>CLIQXI PHOTOBOOTH POS</title>
+<style>
+  :root{
+    --accent:#000000; /* black accent for white theme */
+    --bg:#ffffff;
+    --text:#111111;
+    --card:#fbfbfb;
+    --muted:#6b6b6b;
+  }
+  *{box-sizing:border-box}
+  body{font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:var(--bg); color:var(--text); margin:0; padding:0;}
+  header{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #eee;background:linear-gradient(0deg, rgba(255,255,255,0.6), rgba(255,255,255,0.6));position:sticky;top:0;z-index:5}
+  .hamburger{font-size:20px;cursor:pointer;padding:8px;border-radius:8px;border:1px solid #eee;background:#fff}
+  .brand{font-weight:800;letter-spacing:1px;font-size:18px}
+  .header-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .container{display:grid;grid-template-columns:1fr 420px;gap:16px;padding:16px;}
+  .card{background:var(--card);padding:14px;border-radius:10px;box-shadow:0 1px 6px rgba(0,0,0,0.04);}
+  .product-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px dashed #eee}
+  .product-row:last-child{border-bottom:0}
+  .prod-info{display:flex;flex-direction:column}
+  .muted{color:var(--muted);font-size:13px}
+  .qty-controls{display:flex;align-items:center;gap:8px}
+  .btn{background:var(--accent);color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+  .btn-ghost{background:transparent;border:1px solid #ddd;padding:6px 10px;border-radius:8px;cursor:pointer}
+  input[type="number"]{width:70px;padding:6px;border-radius:6px;border:1px solid #ddd;text-align:center}
+  .pay-methods{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .pay-methods button{background:#f7f7f7;border:1px solid #eee;padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--text)}
+  .pay-methods button.active{background:var(--accent);color:white}
+  .total{font-weight:800;font-size:20px;margin-top:10px}
+  .receipt{background:#fff;padding:12px;border-radius:8px;border:1px solid #eee;font-family:monospace;white-space:pre-wrap}
+  .controls{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .list{max-height:360px;overflow:auto;margin-top:8px;border-radius:8px;border:1px solid #f0f0f0}
+  .tx-row{display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid #fafafa}
+  .tx-row:last-child{border-bottom:0}
+  .sidebar{position:fixed;left:0;top:0;bottom:0;width:360px;background:#fff;box-shadow:2px 0 12px rgba(0,0,0,0.06);transform:translateX(-420px);transition:transform .25s ease;z-index:10;padding:16px;overflow:auto}
+  .sidebar.open{transform:translateX(0)}
+  .search{display:flex;gap:8px;margin-bottom:8px}
+  input[type="text"]{padding:8px;border-radius:8px;border:1px solid #ddd;width:100%}
+  .small{font-size:13px;color:var(--muted)}
+  .settings-section{margin-top:12px;border-top:1px dashed #eee;padding-top:12px}
+  .logo-preview{height:48px;width:200px;object-fit:contain;background:#fff;padding:6px;border-radius:6px;border:1px solid #eee}
+  .footer{padding:12px 16px;color:var(--muted);font-size:13px;text-align:center}
+  .redeem{display:flex;gap:8px;align-items:center;margin-top:12px}
+  .badge{background:#f1f1f1;padding:6px 8px;border-radius:999px;font-weight:700}
+  .pill{padding:6px 10px;border-radius:999px;background:#f6f6f6;border:1px solid #eee}
+  .flex{display:flex;gap:8px;align-items:center}
+  @media(max-width:980px){.container{grid-template-columns:1fr}.sidebar{position:fixed;width:100%;}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hamburger" id="hamburger">☰</div>
+  <div class="brand">CLIQXI PHOTOBOOTH POS</div>
+  <div class="header-right">
+    <div class="small">Status: <span class="pill" id="onlineStatus">Offline</span></div>
+    <div class="small-muted">v1.0</div>
+  </div>
+</header>
+
+<div class="container">
+  <!-- LEFT: POS panel -->
+  <div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:800">Sell Photos</div>
+          <div class="small muted">Soft Copy = ₱100 (controls sessions) • Printed = ₱50</div>
+        </div>
+        <div id="eventDisplay" class="small muted">Cliqxi Photobooth</div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <div class="product-row">
+          <div class="prod-info">
+            <div style="font-weight:700">Soft Copy</div>
+            <div class="muted">Digital file — each = ₱100 (adds 1 session)</div>
+          </div>
+          <div class="qty-controls">
+            <button class="btn-ghost" onclick="changeQty('soft',-1)">−</button>
+            <input id="softQty" type="number" min="0" value="0" onchange="updateTotals()">
+            <button class="btn-ghost" onclick="changeQty('soft',1)">+</button>
+          </div>
+        </div>
+
+        <div class="product-row">
+          <div class="prod-info">
+            <div style="font-weight:700">Printed Copy</div>
+            <div class="muted">Physical print — each = ₱50</div>
+          </div>
+          <div class="qty-controls">
+            <button class="btn-ghost" onclick="changeQty('print',-1)">−</button>
+            <input id="printQty" type="number" min="0" value="0" onchange="updateTotals()">
+            <button class="btn-ghost" onclick="changeQty('print',1)">+</button>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <label class="small">Customer name (optional)</label>
+          <input id="custName" type="text" placeholder="Name for receipt / search">
+        </div>
+
+        <div style="margin-top:12px;">
+          <div style="font-weight:700">Payment Method</div>
+          <div class="pay-methods" id="payMethods">
+            <button onclick="selectPay('Cash')">Cash</button>
+            <button onclick="selectPay('GCash')">GCash</button>
+            <button onclick="selectPay('Maya')">Maya</button>
+            <button onclick="selectPay('Card')">Card</button>
+          </div>
+        </div>
+
+        <div class="total" id="totalDisplay">₱0</div>
+
+        <div class="controls">
+          <button class="btn" onclick="confirmPayment()">Confirm Payment & Generate Code</button>
+          <button class="btn-ghost" onclick="resetForm()">Reset</button>
+          <button class="btn-ghost" onclick="openSidebar()">Transactions</button>
+        </div>
+
+        <div style="margin-top:12px;font-size:13px;color:var(--muted)">
+          <strong>Note:</strong> Soft copies determine how many sessions the generated code allows.
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-weight:700">Redeem Code (Booth)</div>
+        <div class="small muted">Enter code at booth to start session</div>
+      </div>
+      <div class="redeem">
+        <input id="redeemCode" type="text" placeholder="Enter access code">
+        <button class="btn" onclick="redeem()">Redeem</button>
+      </div>
+      <div id="redeemMsg" class="small muted" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Receipt + log -->
+  <div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-weight:800">Receipt</div>
+        <div class="small-muted">Preview your printed receipt</div>
+      </div>
+
+      <div id="receipt" class="receipt" style="margin-top:10px;">
+        <!-- receipt content populated by JS -->
+        Use the form on the left to build an order.
+      </div>
+
+      <div class="controls" style="margin-top:8px;">
+        <button class="btn-ghost" onclick="printReceipt()">Print</button>
+        <button class="btn-ghost" onclick="reprintLast()">Reprint Last</button>
+        <button class="btn-ghost" onclick="downloadTransactions()">Export JSON</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-weight:700">Quick Actions</div>
+        <div class="small-muted">Settings & Theme</div>
+      </div>
+
+      <div style="margin-top:10px;">
+        <div class="settings-section">
+          <label class="small">Event / Display Name</label>
+          <input id="displayName" type="text" placeholder="Cliqxi Photobooth" onchange="saveSettings()">
+          <div style="margin-top:8px;">
+            <label class="small">Upload Logo (optional)</label><br>
+            <input id="logoUpload" type="file" accept="image/*" onchange="handleLogo(event)">
+            <div style="margin-top:8px;"><img id="logoPreview" class="logo-preview" style="display:none"/></div>
+          </div>
+
+          <div style="margin-top:8px;">
+            <label class="small">Theme Accent Color</label><br>
+            <input id="themeColor" type="color" value="#000000" onchange="updateTheme(this.value)">
+            <div class="small muted" style="margin-top:6px">Default is white theme with black accent.</div>
+          </div>
+
+          <div style="margin-top:8px;">
+            <button class="btn-ghost" onclick="resetSettings()">Reset Settings</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Sidebar (Hamburger) -->
+<div id="sidebar" class="sidebar" aria-hidden="true">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <div style="font-weight:800">All Transactions</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-ghost" onclick="closeSidebar()">Close</button>
+    </div>
+  </div>
+
+  <div class="search">
+    <input id="searchInput" type="text" placeholder="Search by code, name, date..." oninput="renderTransactions()">
+    <select id="filterSelect" onchange="renderTransactions()">
+      <option value="all">All</option>
+      <option value="active">Active</option>
+      <option value="usedup">Used Up</option>
+      <option value="archived">Archived</option>
+    </select>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-bottom:8px">
+    <button class="btn-ghost" onclick="bulkExport()">Export</button>
+    <button class="btn-ghost" onclick="clearArchived()">Clear Archived</button>
+  </div>
+
+  <div id="txList" class="list" role="list"></div>
+
+  <div style="margin-top:12px" class="settings-section">
+    <div style="font-weight:700">Settings</div>
+    <div class="small muted" style="margin-top:6px">Customize receipt header and theme</div>
+    <div style="margin-top:8px">
+      <label class="small">Receipt Title</label>
+      <input id="receiptTitle" type="text" placeholder="Cliqxi Photobooth" onchange="saveSettings()">
+    </div>
+  </div>
+</div>
+
+<footer class="footer">This prototype stores data locally in your browser (localStorage). Upload the file to GitHub and open in a browser to run.</footer>
+
+<script>
+// ======= Utilities =======
+function $(id){return document.getElementById(id)}
+function money(n){return '₱'+Number(n).toLocaleString()}
+function now(){return new Date().toISOString().slice(0,19).replace('T',' ')}
+
+// ======= State & Defaults =======
+const PRICES = { soft:100, print:50 }
+let state = {
+  softQty:0, printQty:0, method:'Cash', name:'', lastTx:null, online:false
+}
+let settings = {
+  displayName: 'Cliqxi Photobooth',
+  receiptTitle: 'Cliqxi Photobooth',
+  logoData: '',
+  accent: '#000000'
+}
+
+// Load stored settings/transactions
+function loadAll(){
+  try{
+    const s = localStorage.getItem('cliqxi_settings')
+    if(s) settings = JSON.parse(s)
+    const d = localStorage.getItem('cliqxi_state')
+    if(d) state = JSON.parse(d)
+    const tx = localStorage.getItem('cliqxi_tx') || '[]'
+    window.transactions = JSON.parse(tx)
+  }catch(e){
+    console.error('load failed',e)
+    window.transactions = []
+  }
+  // apply settings
+  $('displayName').value = settings.displayName || 'Cliqxi Photobooth'
+  $('receiptTitle').value = settings.receiptTitle || 'Cliqxi Photobooth'
+  if(settings.logoData){ $('logoPreview').src = settings.logoData; $('logoPreview').style.display='block' }
+  if(settings.accent) { $('themeColor').value = settings.accent; updateTheme(settings.accent) }
+  renderEventName()
+  renderTransactions()
+  updateTotals()
+  updateOnlinePill()
+}
+loadAll()
+
+// ======= UI helpers =======
+function renderEventName(){
+  $('eventDisplay').innerText = settings.displayName || 'Cliqxi Photobooth'
+  document.querySelector('.brand').innerText = 'CLIQXI PHOTOBOOTH POS'
+}
+function updateOnlinePill(){ $('onlineStatus').innerText = state.online ? 'Online' : 'Offline' }
+
+function changeQty(type,delta){
+  const el = type==='soft' ? $('softQty') : $('printQty')
+  let v = Number(el.value)||0
+  v += delta
+  if(v<0) v=0
+  el.value = v
+  updateTotals()
+}
+
+function updateTotals(){
+  state.softQty = Number($('softQty').value)||0
+  state.printQty = Number($('printQty').value)||0
+  state.name = $('custName').value.trim()
+  const total = state.softQty*PRICES.soft + state.printQty*PRICES.print
+  $('totalDisplay').innerText = money(total)
+  // update receipt preview
+  renderReceiptPreview()
+}
+
+function selectPay(m){
+  state.method = m
+  Array.from(document.querySelectorAll('.pay-methods button')).forEach(b=>{
+    if(b.innerText===m) b.classList.add('active'); else b.classList.remove('active')
+  })
+}
+
+function generateCode(){
+  // CXI-(4or5digit)
+  const digits = Math.random()<0.6?4:5
+  let num = Math.floor(Math.random()*Math.pow(10,digits))
+  num = String(num).padStart(digits,'0')
+  return 'CXI-'+num
+}
+
+// ======= Transactions management =======
+function saveTxList(){
+  localStorage.setItem('cliqxi_tx', JSON.stringify(window.transactions))
+}
+
+function confirmPayment(){
+  updateTotals()
+  const total = state.softQty*PRICES.soft + state.printQty*PRICES.print
+  if(total<=0){ alert('Please add an item before confirming payment.'); return }
+  const code = generateCode()
+  const tx = {
+    id: code,
+    softQty: state.softQty,
+    printQty: state.printQty,
+    total: total,
+    method: state.method || 'Cash',
+    session_limit: state.softQty,
+    session_used: 0,
+    status: state.softQty>0? 'Active' : 'UsedUp',
+    name: state.name || '',
+    createdAt: now(),
+    archived: false
+  }
+  window.transactions.unshift(tx)
+  saveTxList()
+  state.lastTx = tx
+  $('receipt').innerText = buildReceiptText(tx)
+  // store last printed
+  localStorage.setItem('cliqxi_last', JSON.stringify(tx))
+  renderTransactions()
+  alert('Payment recorded. Access code: ' + code)
+  // reset form (but keep name)
+  $('softQty').value = 0; $('printQty').value = 0; updateTotals()
+}
+
+function buildReceiptText(tx){
+  const title = settings.receiptTitle || 'Cliqxi Photobooth'
+  const logoLine = settings.logoData ? '' : ''
+  let lines = []
+  lines.push(title)
+  lines.push('--------------------------')
+  if(tx.softQty>0) lines.push('Soft Copy x'+tx.softQty+' = '+money(tx.softQty*PRICES.soft))
+  if(tx.printQty>0) lines.push('Printed Copy x'+tx.printQty+' = '+money(tx.printQty*PRICES.print))
+  lines.push('Payment Method: '+tx.method)
+  lines.push('--------------------------')
+  lines.push('TOTAL: '+money(tx.total))
+  lines.push('Access Code: '+tx.id)
+  lines.push('')
+  lines.push('Use this code to access the booth')
+  lines.push('Valid for '+(tx.session_limit || 0)+' session'+((tx.session_limit>1)?'s':'')+' only')
+  lines.push('--------------------------')
+  lines.push('Thank you for choosing Cliqxi 💖')
+  lines.push('Date: '+tx.createdAt)
+  return lines.join('\\n')
+}
+
+function renderReceiptPreview(){
+  const soft = Number($('softQty').value)||0
+  const print = Number($('printQty').value)||0
+  const tmp = {
+    id: '—',
+    softQty: soft,
+    printQty: print,
+    total: soft*PRICES.soft + print*PRICES.print,
+    method: state.method || 'Cash',
+    session_limit: soft
+  }
+  $('receipt').innerText = buildReceiptText(tmp)
+}
+
+function renderTransactions(){
+  const container = $('txList')
+  container.innerHTML = ''
+  const q = $('searchInput').value.trim().toLowerCase()
+  const filter = $('filterSelect').value
+  const list = window.transactions || []
+  const filtered = list.filter(tx=>{
+    if(filter==='active' && tx.status.toLowerCase()!=='active') return false
+    if(filter==='usedup' && tx.status.toLowerCase()!=='usedup') return false
+    if(filter==='archived' && !tx.archived) return false
+    if(q==='') return true
+    return (tx.id && tx.id.toLowerCase().includes(q)) || (tx.name && tx.name.toLowerCase().includes(q)) || (tx.createdAt && tx.createdAt.toLowerCase().includes(q))
+  })
+  if(filtered.length===0){ container.innerHTML = '<div style="padding:12px;color:var(--muted)">No transactions found</div>'; return }
+  filtered.forEach(tx=>{
+    const div = document.createElement('div'); div.className='tx-row'
+    const left = document.createElement('div')
+    left.innerHTML = '<div style="font-weight:700">'+ (tx.name || 'Guest') + ' <span class="small muted">('+tx.method+')</span></div><div class="small">'+tx.id+' • '+money(tx.total)+' • '+tx.createdAt+'</div>'
+    const right = document.createElement('div'); right.style.display='flex'; right.style.gap='6px'; right.style.alignItems='center'
+    const viewBtn = document.createElement('button'); viewBtn.className='btn-ghost'; viewBtn.innerText='View'; viewBtn.onclick = ()=>{ viewTx(tx.id) }
+    const reprintBtn = document.createElement('button'); reprintBtn.className='btn-ghost'; reprintBtn.innerText='Reprint'; reprintBtn.onclick = ()=>{ reprint(tx.id) }
+    const editBtn = document.createElement('button'); editBtn.className='btn-ghost'; editBtn.innerText='Edit'; editBtn.onclick = ()=>{ editTx(tx.id) }
+    const archiveBtn = document.createElement('button'); archiveBtn.className='btn-ghost'; archiveBtn.innerText='Archive'; archiveBtn.onclick = ()=>{ archiveTx(tx.id) }
+    right.appendChild(viewBtn); right.appendChild(reprintBtn); right.appendChild(editBtn); right.appendChild(archiveBtn)
+    div.appendChild(left); div.appendChild(right)
+    container.appendChild(div)
+  })
+}
+
+function viewTx(id){
+  const tx = window.transactions.find(t=>t.id===id)
+  if(!tx) return alert('Transaction not found')
+  $('receipt').innerText = buildReceiptText(tx)
+}
+
+function reprint(id){
+  const tx = window.transactions.find(t=>t.id===id)
+  if(!tx) return alert('Transaction not found')
+  $('receipt').innerText = buildReceiptText(tx)
+  window.print()
+}
+
+function reprintLast(){
+  const last = JSON.parse(localStorage.getItem('cliqxi_last')||'null')
+  if(!last) return alert('No last transaction found')
+  $('receipt').innerText = buildReceiptText(last)
+  window.print()
+}
+
+function editTx(id){
+  const idx = window.transactions.findIndex(t=>t.id===id)
+  if(idx===-1) return alert('Not found')
+  const tx = window.transactions[idx]
+  const newSoft = Number(prompt('Soft copies qty', tx.softQty))
+  if(isNaN(newSoft)) return
+  const newPrint = Number(prompt('Printed copies qty', tx.printQty))
+  if(isNaN(newPrint)) return
+  tx.softQty = newSoft; tx.printQty = newPrint; tx.session_limit = newSoft; tx.total = tx.softQty*PRICES.soft + tx.printQty*PRICES.print
+  if(tx.session_used >= tx.session_limit) tx.status='UsedUp'; else tx.status='Active'
+  window.transactions[idx]=tx; saveTxList(); renderTransactions(); alert('Transaction updated')
+}
+
+function archiveTx(id){
+  const idx = window.transactions.findIndex(t=>t.id===id)
+  if(idx===-1) return
+  window.transactions[idx].archived = true
+  saveTxList(); renderTransactions()
+  alert('Transaction archived')
+}
+
+function clearArchived(){
+  window.transactions = window.transactions.filter(t=>!t.archived)
+  saveTxList(); renderTransactions()
+}
+
+function bulkExport(){
+  const data = JSON.stringify(window.transactions, null, 2)
+  const blob = new Blob([data], {type:'application/json'})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href=url; a.download='cliqxi_transactions.json'; a.click(); URL.revokeObjectURL(url)
+}
+
+// ======= Redeem logic =======
+function redeem(){
+  const code = $('redeemCode').value.trim().toUpperCase()
+  if(!code){ $('redeemMsg').innerText='Please enter a code'; return }
+  const tx = window.transactions.find(t=>t.id===code)
+  if(!tx){ $('redeemMsg').innerText='Code not found'; return }
+  if(tx.archived){ $('redeemMsg').innerText='This code is archived'; return }
+  if(tx.session_used >= tx.session_limit){ tx.status='UsedUp'; saveTxList(); renderTransactions(); $('redeemMsg').innerText='All sessions already used for this code'; return }
+  tx.session_used += 1
+  if(tx.session_used >= tx.session_limit) tx.status='UsedUp'
+  saveTxList(); renderTransactions()
+  $('redeemMsg').innerText = 'Success! Session started. Remaining: '+(tx.session_limit - tx.session_used)
+}
+
+// ======= Sidebar controls =======
+$('hamburger').addEventListener('click', ()=>{ openSidebar() })
+function openSidebar(){ $('sidebar').classList.add('open'); $('sidebar').setAttribute('aria-hidden','false') }
+function closeSidebar(){ $('sidebar').classList.remove('open'); $('sidebar').setAttribute('aria-hidden','true') }
+
+// ======= Settings =======
+function handleLogo(e){
+  const f = e.target.files[0]; if(!f) return
+  const reader = new FileReader(); reader.onload = (ev)=>{
+    settings.logoData = ev.target.result; localStorage.setItem('cliqxi_settings', JSON.stringify(settings)); $('logoPreview').src = settings.logoData; $('logoPreview').style.display='block'
+  }; reader.readAsDataURL(f)
+}
+
+function updateTheme(hex){
+  document.documentElement.style.setProperty('--accent', hex)
+  settings.accent = hex; localStorage.setItem('cliqxi_settings', JSON.stringify(settings))
+  // update button colors immediately
+  Array.from(document.querySelectorAll('.btn')).forEach(b=>b.style.background=hex)
+}
+
+function saveSettings(){
+  settings.displayName = $('displayName').value || 'Cliqxi Photobooth'
+  settings.receiptTitle = $('receiptTitle').value || 'Cliqxi Photobooth'
+  localStorage.setItem('cliqxi_settings', JSON.stringify(settings))
+  renderEventName()
+}
+
+function resetSettings(){
+  if(!confirm('Reset settings to defaults?')) return
+  settings = { displayName:'Cliqxi Photobooth', receiptTitle:'Cliqxi Photobooth', logoData:'', accent:'#000000' }
+  localStorage.setItem('cliqxi_settings', JSON.stringify(settings))
+  $('displayName').value = settings.displayName; $('receiptTitle').value = settings.receiptTitle; $('logoPreview').style.display='none'; $('themeColor').value = '#000000'; updateTheme('#000000'); renderEventName()
+}
+
+// ======= Export / Import =======
+function downloadTransactions(){
+  const data = JSON.stringify(window.transactions||[], null, 2)
+  const blob = new Blob([data], {type:'application/json'})
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'cliqxi_transactions.json'; a.click()
+}
+
+// ======= Misc =======
+function resetForm(){
+  $('softQty').value = 0; $('printQty').value = 0; $('custName').value=''; selectPay('Cash'); updateTotals()
+}
+
+function openSidebarFromBtn(){ openSidebar() }
+
+// initial selection
+selectPay('Cash')
+renderEventName()
+
+// expose some helpers to global for debugging
+window.changeQty = changeQty
+window.updateTotals = updateTotals
+window.openSidebar = openSidebar
+window.closeSidebar = closeSidebar
+window.renderTransactions = renderTransactions
+window.downloadTransactions = downloadTransactions
+window.bulkExport = bulkExport
+window.clearArchived = clearArchived
+window.editTx = editTx
+window.archiveTx = archiveTx
+window.reprint = reprint
+
+</script>
+
+</body>
+</html>
